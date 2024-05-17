@@ -64,6 +64,10 @@ export function decodeMessageNode(
 		msgType = 'group'
 		author = participant
 		chatId = from
+	} else if(isJidNewsletter(from)){
+		msgType = 'newsletter'
+		author = from
+		chatId = from
 	} else if(isJidBroadcast(from)) {
 		if(!participant) {
 			throw new Boom('No participant in group message')
@@ -168,6 +172,9 @@ export const decryptMessageNode = (
 							})
 							break
 						case 'plaintext':
+							msgBuffer = content
+							break
+						case undefined:
 							msgBuffer = content
 							break
 						default:
