@@ -64,7 +64,7 @@ export function decodeMessageNode(
 		msgType = 'group'
 		author = participant
 		chatId = from
-	} else if(isJidNewsletter(from)){
+	} else if(isJidNewsletter(from)) {
 		msgType = 'newsletter'
 		author = from
 		chatId = from
@@ -150,7 +150,9 @@ export const decryptMessageNode = (
 
 					decryptables += 1
 
-					let msgBuffer: Uint8Array
+					let msg: proto.IMessage
+					let msgBuffer: Uint8Array | undefined
+					let newsletterReaction: string | undefined
 
 					try {
 						const e2eType = tag === 'plaintext' ? 'plaintext' : attrs.type
@@ -174,6 +176,9 @@ export const decryptMessageNode = (
 						case 'plaintext':
 							msgBuffer = content
 							break
+						case 'reaction':
+							newsletterReaction = attrs.code
+							break
 						case undefined:
 							msgBuffer = content
 							break
@@ -181,23 +186,29 @@ export const decryptMessageNode = (
 							throw new Error(`Unknown e2e type: ${e2eType}`)
 						}
 
-						let msg: proto.IMessage = proto.Message.decode(e2eType !== 'plaintext' ? unpadRandomMax16(msgBuffer) : msgBuffer)
-						msg = msg.deviceSentMessage?.message || msg
-						if(msg.senderKeyDistributionMessage) {
-						    try {
-								await repository.processSenderKeyDistributionMessage({
-									authorJid: author,
-									item: msg.senderKeyDistributionMessage
-								})
-							} catch(err) {
-								logger.error({ key: fullMessage.key, err }, 'failed to decrypt message')
-						        }
-						}
+						if(newsletterReaction || msgBuffer) {
+							if(!msgBuffer) {
+								msg = { reactionMessage: { text: newsletterReaction } }
+							}else{
+								msg = proto.Message.decode(e2eType !== 'plaintext' ? unpadRandomMax16(msgBuffer) : msgBuffer)
+								msg = msg.deviceSentMessage?.message || msg
+								if(msg.senderKeyDistributionMessage) {
+									try {
+										await repository.processSenderKeyDistributionMessage({
+											authorJid: author,
+											item: msg.senderKeyDistributionMessage
+										})
+									} catch(err) {
+										logger.error({ key: fullMessage.key, err }, 'failed to decrypt message')
+									}
+								}
+							}
 
-						if(fullMessage.message) {
-							Object.assign(fullMessage.message, msg)
-						} else {
-							fullMessage.message = msg
+							if(fullMessage.message) {
+								Object.assign(fullMessage.message, msg)
+							} else {
+								fullMessage.message = msg
+							}
 						}
 					} catch(err) {
 						logger.error(
