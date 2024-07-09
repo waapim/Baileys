@@ -389,6 +389,7 @@ export const encryptedStream = async(
 			}
 
 			onChunk(aes.update(data))
+			encWriteStream.push(data)
 		}
 
 		onChunk(aes.final())
@@ -399,7 +400,7 @@ export const encryptedStream = async(
 		const fileSha256 = sha256Plain.digest()
 		const fileEncSha256 = sha256Enc.digest()
 
-		encWriteStream.push(mac)
+		// encWriteStream.push(mac)
 		encWriteStream.push(null)
 
 		writeStream?.end()
@@ -441,7 +442,7 @@ export const encryptedStream = async(
 	function onChunk(buff: Buffer) {
 		sha256Enc = sha256Enc.update(buff)
 		hmac = hmac.update(buff)
-		encWriteStream.push(buff)
+		// encWriteStream.push(buff)
 	}
 }
 
