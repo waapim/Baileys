@@ -27,7 +27,15 @@ import { isJidGroup, isJidNewsletter, isJidStatusBroadcast, jidNormalizedUser } 
 import { sha256 } from './crypto'
 import { generateMessageID, getKeyAuthor, unixTimestampSeconds } from './generics'
 import { ILogger } from './logger'
-import { downloadContentFromMessage, encryptedStream, generateThumbnail, getAudioDuration, getAudioWaveform, MediaDownloadOptions } from './messages-media'
+import {
+	downloadContentFromMessage,
+	encryptedStream,
+	generateThumbnail,
+	getAudioDuration,
+	getAudioWaveform,
+	getHttpStream,
+	MediaDownloadOptions
+} from './messages-media'
 
 type MediaUploadData = {
 	media: WAMediaUpload
@@ -904,7 +912,8 @@ export const downloadMediaMessage = async<Type extends 'buffer' | 'stream'>(
 			download = media
 		}
 
-		const stream = await downloadContentFromMessage(download, mediaType, options)
+		const shouldDecrypt = !isJidNewsletter(message.key.remoteJid || undefined)
+		const stream = await downloadContentFromMessage(download, mediaType, options, shouldDecrypt)
 		if(type === 'buffer') {
 			const bufferArray: Buffer[] = []
 			for await (const chunk of stream) {
