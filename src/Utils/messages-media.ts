@@ -627,22 +627,19 @@ export const getWAUploadToServer = (
 		const reqBody = Buffer.concat(chunks)
 		fileSha256B64 = encodeBase64EncodedStringForUpload(fileSha256B64)
 
-		for(const { hostname, maxContentLengthBytes } of hosts) {
+		for(const { hostname } of hosts) {
 			logger.debug(`uploading to "${hostname}"`)
 
 			const auth = encodeURIComponent(uploadInfo.auth) // the auth token
 			let urlPrefix: string | undefined
 			if (newsletter){
-				urlPrefix =  `/newsletter/newsletter-${mediaType}`
+				urlPrefix = `/newsletter/newsletter-${mediaType}`
 			} else {
-				urlPrefix =  MEDIA_PATH_MAP[mediaType]
+				urlPrefix = MEDIA_PATH_MAP[mediaType]
 			}
 			const url = `https://${hostname}${urlPrefix}/${fileSha256B64}?auth=${auth}&token=${fileSha256B64}`
 			let result: any
 			try {
-				if(maxContentLengthBytes && reqBody.length > maxContentLengthBytes) {
-					throw new Boom(`Body too large for "${hostname}"`, { statusCode: 413 })
-				}
 
 				const body = await axios.post(
 					url,
