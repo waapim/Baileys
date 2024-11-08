@@ -30,6 +30,7 @@ import {
 	parseAndInjectE2ESessions,
 	unixTimestampSeconds
 } from '../Utils'
+import { batched } from '../Utils/batched'
 import { getUrlInfo } from '../Utils/link-preview'
 import {
 	areJidsSameUser,
@@ -48,6 +49,8 @@ import {
 import { USyncQuery, USyncUser } from '../WAUSync'
 import { makeGroupsSocket } from './groups'
 import { makeNewsletterSocket, NewsletterSocket } from './newsletter'
+
+const BATCH_JID_SIZE = 5_000
 
 export const makeMessagesSocket = (config: SocketConfig) => {
 	const {
@@ -181,7 +184,7 @@ export const makeMessagesSocket = (config: SocketConfig) => {
 	}
 
 	/** Fetch all the devices we've to send a message to */
-	const getUSyncDevices = async (jids: string[], useCache: boolean, ignoreZeroDevices: boolean) => {
+	let getUSyncDevices = async (jids: string[], useCache: boolean, ignoreZeroDevices: boolean) => {
 		const deviceResults: JidWithDevice[] = []
 
 		if (!useCache) {
@@ -239,7 +242,9 @@ export const makeMessagesSocket = (config: SocketConfig) => {
 		return deviceResults
 	}
 
-	const assertSessions = async (jids: string[], force: boolean) => {
+	getUSyncDevices = batched(getUSyncDevices, BATCH_JID_SIZE, (results: JidWithDevice[][]) => results.flat())
+
+	let assertSessions = async (jids: string[], force: boolean) => {
 		let didFetchNewSession = false
 		let jidsRequiringFetch: string[] = []
 		if (force) {
@@ -282,6 +287,9 @@ export const makeMessagesSocket = (config: SocketConfig) => {
 
 		return didFetchNewSession
 	}
+
+	// batch processing, return true if any
+	assertSessions = batched(assertSessions, BATCH_JID_SIZE, (results: boolean[]) => results.some(Boolean))
 
 	const sendPeerDataOperationMessage = async (
 		pdoMessage: proto.Message.IPeerDataOperationRequestMessage
