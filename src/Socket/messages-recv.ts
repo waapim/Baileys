@@ -90,6 +90,12 @@ export const makeMessagesRecvSocket = (config: SocketConfig) => {
 	let sendActiveReceipts = false
 
 	const sendMessageAck = async({ tag, attrs, content }: BinaryNode) => {
+		// If ws not connected - logs it and return
+		if(!ws.isOpen) {
+			logger.warn({ attrs: attrs }, 'Client not connected, cannot send ack')
+			return
+		}
+
 		const stanza: BinaryNode = {
 			tag: 'ack',
 			attrs: {
