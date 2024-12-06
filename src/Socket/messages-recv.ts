@@ -818,7 +818,9 @@ export const makeMessagesRecvSocket = (config: SocketConfig) => {
 			await Promise.all([
 				processingMutex.mutex(async () => {
 					await decrypt()
-					// message failed to decrypt
+cleanMessage(msg, authState.creds.me!.id)
+
+						await upsertMessage(msg, node.attrs.offline ? 'append' : 'notify')					// message failed to decrypt
 					if (msg.messageStubType === proto.WebMessageInfo.StubType.CIPHERTEXT) {
 						if (msg?.messageStubParameters?.[0] === MISSING_KEYS_ERROR_TEXT) {
 							return sendMessageAck(node, NACK_REASONS.ParsingError)
@@ -867,15 +869,11 @@ export const makeMessagesRecvSocket = (config: SocketConfig) => {
 						}
 					}
 
-					cleanMessage(msg, authState.creds.me!.id)
-
+					}
+				)
+					])
+		} finally {
 					await sendMessageAck(node)
-
-					await upsertMessage(msg, node.attrs.offline ? 'append' : 'notify')
-				})
-			])
-		} catch (error) {
-			logger.error({ error, node }, 'error in handling message')
 		}
 	}
 
