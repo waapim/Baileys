@@ -837,6 +837,11 @@ export const makeMessagesRecvSocket = (config: SocketConfig) => {
 				processingMutex.mutex(
 					async() => {
 						await decrypt()
+
+						cleanMessage(msg, authState.creds.me!.id)
+
+						await upsertMessage(msg, node.attrs.offline ? 'append' : 'notify')
+
 						// message failed to decrypt
 						if(msg.messageStubType === proto.WebMessageInfo.StubType.CIPHERTEXT) {
 							retryMutex.mutex(
@@ -882,9 +887,6 @@ export const makeMessagesRecvSocket = (config: SocketConfig) => {
 							}
 						}
 
-						cleanMessage(msg, authState.creds.me!.id)
-
-						await upsertMessage(msg, node.attrs.offline ? 'append' : 'notify')
 					}
 				)
 			])
