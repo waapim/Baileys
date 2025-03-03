@@ -231,6 +231,8 @@ export type MiscMessageGenerationOptions = MinimalRelayOptions & {
     font?: number
     /** if it is broadcast */
     broadcast?: boolean
+    /** upload high quality preview for link previews */
+    linkPreviewHighQuality?: boolean
 }
 export type MessageGenerationOptionsFromContent = MiscMessageGenerationOptions & {
 	userJid: string
