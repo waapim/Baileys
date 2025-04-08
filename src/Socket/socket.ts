@@ -197,6 +197,7 @@ export const makeSocket = (config: SocketConfig) => {
 					ws.on(`TAG:${msgId}`, onRecv)
 					ws.on('close', onErr) // if the socket closes, you'll never receive the message
 					ws.on('error', onErr)
+					ws.on('CB:stream:error', onErr)
 				},
 			)
 
@@ -205,6 +206,7 @@ export const makeSocket = (config: SocketConfig) => {
 			ws.off(`TAG:${msgId}`, onRecv!)
 			ws.off('close', onErr!) // if the socket closes, you'll never receive the message
 			ws.off('error', onErr!)
+			ws.off('CB:stream:error', onErr!)
 		}
 	}
 
