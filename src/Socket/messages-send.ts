@@ -496,7 +496,7 @@ export const makeMessagesSocket = (config: SocketConfig) => {
 					await authState.keys.set({ 'sender-key-memory': { [jid]: senderKeyMap } })
 				} else if(isNewsletter) {
 					const patched = await patchMessageBeforeSending(message, [])
-					const bytes = encodeNewsletterMessage(patched)
+					const bytes = encodeNewsletterMessage(patched as proto.IMessage)
 
 					binaryNodeContent.push({
 						tag: 'plaintext',
