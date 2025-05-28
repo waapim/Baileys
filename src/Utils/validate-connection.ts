@@ -8,6 +8,12 @@ import { Curve, hmacSign } from './crypto'
 import { encodeBigEndian } from './generics'
 import { createSignalIdentity } from './signal'
 
+// Prefixes for device signature generation
+const AdvPrefixAccountSignature = Buffer.from([6, 0])
+const AdvPrefixDeviceSignatureGenerate = Buffer.from([6, 1])
+const AdvHostedPrefixDeviceIdentityAccountSignature = Buffer.from([6, 5])
+const AdvHostedPrefixDeviceIdentityDeviceSignatureVerification = Buffer.from([6, 6])
+
 const getUserAgent = (config: SocketConfig): proto.ClientPayload.IUserAgent => {
 	return {
 		appVersion: {
@@ -129,9 +135,14 @@ export const configureSuccessfulPairing = (
 	const bizName = businessNode?.attrs.name
 	const jid = deviceNode.attrs.jid
 
-	const { details, hmac } = proto.ADVSignedDeviceIdentityHMAC.decode(deviceIdentityNode.content as Buffer)
+	const { details, hmac, accountType } = proto.ADVSignedDeviceIdentityHMAC.decode(deviceIdentityNode.content as Buffer)
+	// check if account is hosted
+	const isHostedAccount = accountType !== undefined && accountType === proto.ADVEncryptionType.HOSTED
+
 	// check HMAC matches
-	const advSign = hmacSign(details!, Buffer.from(advSecretKey, 'base64'))
+	// use appropriate prefix based on account type
+	const hmacPrefix = isHostedAccount ? AdvHostedPrefixDeviceIdentityAccountSignature : Buffer.alloc(0)
+	const advSign = hmacSign(Buffer.concat([hmacPrefix, details!]), Buffer.from(advSecretKey, 'base64'))
 	if(Buffer.compare(hmac!, advSign) !== 0) {
 		throw new Boom('Invalid account signature')
 	}
@@ -145,7 +156,9 @@ export const configureSuccessfulPairing = (
 	}
 
 	// sign the details with our identity key
-	const deviceMsg = Buffer.concat([ Buffer.from([6, 1]), deviceDetails!, signedIdentityKey.public, accountSignatureKey! ])
+	// use appropriate prefix based on account type
+	const devicePrefix = isHostedAccount ? AdvHostedPrefixDeviceIdentityDeviceSignatureVerification : AdvPrefixDeviceSignatureGenerate
+	const deviceMsg = Buffer.concat([devicePrefix, deviceDetails!, signedIdentityKey.public, accountSignatureKey!])
 	account.deviceSignature = Curve.sign(signedIdentityKey.private, deviceMsg)
 
 	const identity = createSignalIdentity(jid, accountSignatureKey!)
