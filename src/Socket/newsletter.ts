@@ -1,7 +1,14 @@
-import type { NewsletterCreateResponse, WAMediaUpload } from '../Types'
+import type { NewsletterCreateResponse, NewsletterFetchedUpdate, NewsletterReaction, WAMediaUpload } from '../Types'
 import { NewsletterMetadata, NewsletterUpdate, QueryIds, XWAPaths } from '../Types'
+import { decryptMessageNode } from '../Utils'
 import { generateProfilePicture } from '../Utils/messages-media'
-import { getBinaryNodeChild } from '../WABinary'
+import {
+	BinaryNode,
+	getAllBinaryNodeChildren,
+	getBinaryNodeChild,
+	getBinaryNodeChildren,
+	S_WHATSAPP_NET
+} from '../WABinary'
 import { GroupsSocket } from './groups'
 import { executeWMexQuery as genericExecuteWMexQuery } from './mex'
 
@@ -43,7 +50,7 @@ const parseNewsletterMetadata = (result: unknown): NewsletterMetadata | null => 
 }
 
 export const makeNewsletterSocket = (sock: GroupsSocket) => {
-	const { query, generateMessageTag } = sock
+	const { query, generateMessageTag, authState, signalRepository } = sock
 
 	const executeWMexQuery = <T>(variables: Record<string, unknown>, queryId: string, dataPath: string): Promise<T> => {
 		return genericExecuteWMexQuery<T>(variables, queryId, dataPath, query, generateMessageTag)
@@ -58,6 +65,59 @@ export const makeNewsletterSocket = (sock: GroupsSocket) => {
 			}
 		}
 		return executeWMexQuery(variables, QueryIds.UPDATE_METADATA, 'xwa2_newsletter_update')
+	}
+
+	const parseFetchedUpdates = async (node: BinaryNode, type: 'messages' | 'updates') => {
+		let child
+
+		if (type === 'messages') {
+			child = getBinaryNodeChild(node, 'messages')
+		} else {
+			const parent = getBinaryNodeChild(node, 'message_updates')
+			child = getBinaryNodeChild(parent, 'messages')
+		}
+
+		return await Promise.all(
+			getAllBinaryNodeChildren(child).map(async messageNode => {
+				messageNode.attrs.from = child?.attrs.jid as string
+
+				const views = getBinaryNodeChild(messageNode, 'views_count')?.attrs?.count
+				const reactionNode = getBinaryNodeChild(messageNode, 'reactions')
+				const reactions = getBinaryNodeChildren(reactionNode, 'reaction').map(
+					({ attrs }) => ({ count: +attrs.count, code: attrs.code }) as NewsletterReaction
+				)
+
+				let data: NewsletterFetchedUpdate
+				if (type === 'messages') {
+					const { fullMessage: message, decrypt } = await decryptMessageNode(
+						messageNode,
+						authState.creds.me!.id,
+						authState.creds.me!.lid || '',
+						signalRepository,
+						sock.config.logger
+					)
+
+					await decrypt()
+
+					data = {
+						server_id: messageNode.attrs.server_id,
+						views: views ? +views : undefined,
+						reactions,
+						message
+					}
+
+					return data
+				} else {
+					data = {
+						server_id: messageNode.attrs.server_id,
+						views: views ? +views : undefined,
+						reactions
+					}
+
+					return data
+				}
+			})
+		)
 	}
 
 	return {
@@ -100,7 +160,8 @@ export const makeNewsletterSocket = (sock: GroupsSocket) => {
 				fetch_viewer_metadata: true,
 				input: {
 					key,
-					type: type.toUpperCase()
+					type: type.toUpperCase(),
+					view_role: 'GUEST'
 				}
 			}
 			const result = await executeWMexQuery<unknown>(variables, QueryIds.METADATA, XWAPaths.xwa2_newsletter_metadata)
@@ -228,6 +289,26 @@ export const makeNewsletterSocket = (sock: GroupsSocket) => {
 
 		newsletterDelete: async (jid: string) => {
 			await executeWMexQuery({ newsletter_id: jid }, QueryIds.DELETE, XWAPaths.xwa2_newsletter_delete_v2)
+		},
+
+		newsletterFetchPreviewMessages: async (type: 'invite' | 'jid', key: string, count: number, after?: number) => {
+			const afterStr: any = after?.toString()
+			const result = await query({
+				tag: 'iq',
+				attrs: {
+					id: generateMessageTag(),
+					type: 'get',
+					xmlns: 'newsletter',
+					to: S_WHATSAPP_NET
+				},
+				content: [
+					{
+						tag: 'messages',
+						attrs: { type, ...(type === 'invite' ? { key } : { jid: key }), count: count.toString(), after: afterStr }
+					}
+				]
+			})
+			return await parseFetchedUpdates(result, 'messages')
 		}
 	}
 }
