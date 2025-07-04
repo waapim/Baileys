@@ -74,7 +74,7 @@ export const makeNewsletterSocket = (sock: GroupsSocket) => {
 				QueryIds.CREATE,
 				XWAPaths.xwa2_newsletter_create
 			)
-			return parseNewsletterCreateResponse(rawResponse)
+			return rawResponse as any
 		},
 
 		newsletterUpdate,
