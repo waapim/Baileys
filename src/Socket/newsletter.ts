@@ -62,6 +62,7 @@ export const makeNewsletterSocket = (sock: GroupsSocket) => {
 
 	return {
 		...sock,
+		executeWMexQuery,
 		newsletterCreate: async (name: string, description?: string): Promise<NewsletterMetadata> => {
 			const variables = {
 				input: {
