@@ -1,3 +1,5 @@
+import { proto } from '../../WAProto'
+
 export enum XWAPaths {
 	xwa2_newsletter_create = 'xwa2_newsletter_create',
 	xwa2_newsletter_subscribers = 'xwa2_newsletter_subscribers',
@@ -97,4 +99,17 @@ export interface NewsletterMetadata {
 		name?: string
 		description?: string
 	}
+}
+
+export type NewsletterReaction = { count: number; code: string }
+
+export type NewsletterFetchedUpdate = {
+	/**id of message in newsletter, starts from 100 */
+	server_id: string
+	/**count of views in this message */
+	views?: number
+	/**reactions in this message */
+	reactions: NewsletterReaction[]
+	/**the message, if you requested only updates, you will not receive message */
+	message?: proto.IWebMessageInfo
 }
